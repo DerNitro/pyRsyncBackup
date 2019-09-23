@@ -311,7 +311,7 @@ appConfiguration = rb_conf.AppConfiguration('/etc/pyRsyncBackup/pyRsyncBackup.co
 if not os.path.isdir(appConfiguration.log['dir']):
     try:
         os.mkdir(appConfiguration.log['dir'])
-    except OSError, e:
+    except OSError as e:
         print('Ошибка создания директории лог файлов')
         print(e)
         sys.exit(1)
