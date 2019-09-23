@@ -1,0 +1,15 @@
+[Unit]
+Description=pyRsyncBackup
+After=network.target
+
+[Service]
+Type=simple
+PIDFile=/run/pyRsyncBackup.pid
+ExecStart=/usr/bin/python2 /opt/pyRsyncBackup/pyRsyncBackup.py
+ExecStop=/bin/kill -15 $MAINPID
+PrivateTmp=true
+User=backup
+Group=backup
+
+[Install]
+WantedBy=multi-user.target
