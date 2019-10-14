@@ -176,7 +176,7 @@ def check_database(engine):
         connection = engine.connect()
         connection.execute("select datname from pg_database;")
         connection.close()
-    except sql_exc.DisconnectionError, sql_exc.TimeoutError:
+    except (sql_exc.DisconnectionError, sql_exc.TimeoutError):
         raise rb_error.RBError('Ошибка подключения к базе данных: {}'.format(engine))
     except sql_exc.NoSuchTableError:
         raise rb_error.RBError('Ошибка при проверке базы данных: {}'.format(engine))
@@ -240,3 +240,8 @@ def import_host(engine, conf):
         host.load(item[1])
         with edit(engine) as db:
             db.add(host)
+
+
+def get_proxy_list(engine):
+    with select(engine) as db:
+        return db.query(Proxy).all()

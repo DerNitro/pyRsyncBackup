@@ -64,7 +64,3 @@ class Log:
 
     def critical(self, text, exc_info=False):
         self.logger.critical(text, exc_info=exc_info)
-
-    def __del__(self):
-        self.handler.close()
-        self.logger.removeHandler(self.handler)

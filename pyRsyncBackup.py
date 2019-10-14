@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
@@ -45,14 +45,10 @@ import proxy as rb_proxy
 __author__ = 'Sergey Utkin'
 __email__ = 'utkins01@gmail.com'
 __status__ = "Development"
-__version__ = "0.1"
+__version__ = "0.2"
 __maintainer__ = "Sergey Utkin"
 __copyright__ = "Copyright 2019, Sergey Utkin"
 __program__ = 'pyRsyncBackup'
-
-global appLogging
-
-dev_null = open(os.devnull, 'w')
 
 
 def handle_sig_term(signum, frame):
@@ -67,10 +63,10 @@ def app_exit(code):
     sys.exit(code)
 
 
-def alive_host(ip, port):
+def alive_host(ip_address, port):
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.settimeout(3)
-        if sock.connect_ex((ip, port)) == 0:
+        if sock.connect_ex((ip_address, port)) == 0:
             return True
         else:
             return False
@@ -85,7 +81,6 @@ def discovering(host):
         'postgresql://{c.DbLogin}:{c.DbPassword}@{c.DbHost}:{c.DbPort}/{c.DbBase}'.format(c=appConfiguration))
 
     appLogging.debug('Discovering - {host.name}.'.format(host=host))
-    tunnel = None
 
     with rb_db.edit(discover_engine) as dbe:
         discovering_interval = rb_conf.calc_size(host.discovering_interval)
@@ -110,30 +105,23 @@ def discovering(host):
                               appConfiguration.log['size']
                               )
 
+    tunnel = None
+
     if host.proxy:
         with rb_db.select(discover_engine) as db:
-            proxy = db.query(rb_db.Proxy).filter(rb_db.Proxy.id == host.proxy).one()
+            db_proxy = db.query(rb_db.Proxy).filter(rb_db.Proxy.id == host.proxy).one()
 
-        if not alive_host(proxy.ip, proxy.port):
-            appLogging.warning('Хост {host.name} прокси сервер {proxy.ip} - не доступен!!!'
-                               .format(proxy=proxy, host=host))
-            return False
-
-        tunnel = rb_proxy.Proxy(proxy, host, host_logging)
-        try:
-            tunnel.start()
-        except rb_error.RBError as err:
-            appLogging.error(err)
-            del host_logging
-            return False
-
-        if tunnel.is_active():
-            host.ip, host.port = tunnel.get_port_forward_info()
+        if db_proxy.ip in proxy_list:
+            if not proxy_list[db_proxy.ip].is_active():
+                host_logging.warning('Proxy: {proxy.ip} - не доступен!'.format(proxy=db_proxy))
+                return False
         else:
-            appLogging.error('Хост {host.name} прокси сервер {proxy.ip} - Ошибка формирования тунеля!!!'
-                             .format(proxy=proxy, host=host))
-            del host_logging
+            host_logging.error('Proxy: {proxy.ip} - не найден!'.format(proxy=db_proxy))
             return False
+
+        tunnel = proxy_list[db_proxy.ip].open_forwarding_channel(host.ip, host.port, host_logging)
+
+        host.ip, host.port = rb_proxy.get_bind_local(tunnel)
 
     if alive_host(host.ip, host.port):
         host_logging.debug('Хост: {host.name}({host.ip}, {host.port}) - доступен.'.format(host=host))
@@ -151,8 +139,7 @@ def discovering(host):
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
                 run.wait()
-                res = run.communicate()
-            except:
+            except ValueError:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
                 run = 1
             if run.returncode == 0:
@@ -162,14 +149,13 @@ def discovering(host):
             else:
                 host_logging.debug('Хост: {host.name} - нет модуля {module.name}'.format(module=module, host=host))
 
-            del res, run
+            del run
     else:
         host_logging.warning('Хост: {host} - не доступен!'.format(host=host.name))
+    if host.proxy:
+        proxy_list[db_proxy.ip].close_forwarding_channel(tunnel)
 
-    if isinstance(tunnel, rb_proxy.Proxy):
-        tunnel.stop()
-
-    del host_logging, tunnel
+    del host_logging
 
 
 def backup(host):
@@ -180,7 +166,6 @@ def backup(host):
     backup_engine = create_engine(
         'postgresql://{c.DbLogin}:{c.DbPassword}@{c.DbHost}:{c.DbPort}/{c.DbBase}'.format(c=appConfiguration))
 
-    tunnel = None
     appLogging.debug('Backup - {host.name}.'.format(host=host))
 
     with rb_db.edit(backup_engine) as dbe:
@@ -207,32 +192,23 @@ def backup(host):
                               appConfiguration.log['count'],
                               appConfiguration.log['size']
                               )
+    tunnel = None
 
     if host.proxy:
         with rb_db.select(backup_engine) as db:
-            proxy = db.query(rb_db.Proxy).filter(rb_db.Proxy.id == host.proxy).one()
+            db_proxy = db.query(rb_db.Proxy).filter(rb_db.Proxy.id == host.proxy).one()
 
-        if not alive_host(proxy.ip, proxy.port):
-            appLogging.warning('Хост {host.name} прокси сервер {proxy.ip} - не доступен!!!'
-                               .format(proxy=proxy, host=host))
-            del host_logging
-            return False
-
-        tunnel = rb_proxy.Proxy(proxy, host, host_logging)
-        try:
-            tunnel.start()
-        except rb_error.RBError as err:
-            appLogging.error(err)
-            del host_logging
-            return False
-
-        if tunnel.is_active():
-            host.ip, host.port = tunnel.get_port_forward_info()
+        if db_proxy.ip in proxy_list:
+            if not proxy_list[db_proxy.ip].is_active():
+                host_logging.warning('Proxy: {proxy.ip} - не доступен!'.format(proxy=db_proxy))
+                return False
         else:
-            appLogging.error('Хост {host.name} прокси сервер {proxy.ip} - Ошибка формирования тунеля!!!'
-                             .format(proxy=proxy, host=host))
-            del host_logging
+            host_logging.error('Proxy: {proxy.ip} - не найден!'.format(proxy=db_proxy))
             return False
+
+        tunnel = proxy_list[db_proxy.ip].open_forwarding_channel(host.ip, host.port, host_logging)
+
+        host.ip, host.port = rb_proxy.get_bind_local(tunnel)
 
     if alive_host(host.ip, host.port):
         host_logging.debug('Хост: {host.name}({host.ip}, {host.port}) - доступен.'.format(host=host))
@@ -271,8 +247,7 @@ def backup(host):
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
                 run.wait()
-                res = run.communicate()
-            except:
+            except ValueError:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
                 run = 1
             if run.returncode == 0:
@@ -280,10 +255,9 @@ def backup(host):
                     'Хост: {host.name} - успешное резервное копирование {module.name}'.format(module=module, host=host))
             else:
                 host_logging.warning(
-                    'Хост: {host.name} - Ошибка резервного копирования {module.name}\n'
-                    '{res}'.format(module=module, host=host, res=res))
+                    'Хост: {host.name} - Ошибка резервного копирования {module.name}'.format(module=module, host=host))
 
-            del res, run
+            del run
             if os.path.isdir(backup_dir):
                 if len(os.listdir(backup_dir)) == 0:
                     os.rmdir(backup_dir)
@@ -291,10 +265,10 @@ def backup(host):
     else:
         host_logging.warning('Хост: {host} - не доступен!'.format(host=host.name))
 
-    if isinstance(tunnel, rb_proxy.Proxy):
-        tunnel.stop()
+    if host.proxy:
+        proxy_list[db_proxy.ip].close_forwarding_channel(tunnel)
 
-    del host_logging, tunnel
+    del host_logging
 
 
 @contextmanager
@@ -357,9 +331,19 @@ appLogging.debug('Инициализация завершена.')
 interrupted = False
 discovering_list = []
 backup_list = []
+proxy_list = {}
+
+for proxy in rb_db.get_proxy_list(engine):
+    p = rb_proxy.Proxy(proxy, appLogging)
+    try:
+        p.start()
+    except rb_error.RBError as e:
+        appLogging.error(e)
+    finally:
+        proxy_list[p.ip] = p
 
 while True:
-    time.sleep(1)
+    time.sleep(3)
     del discovering_list
     with rb_db.select(engine) as dbs:
         discovering_list = dbs.query(rb_db.Host).filter(rb_db.Host.discovering_date < datetime.datetime.now()).all()
@@ -379,5 +363,14 @@ while True:
         with pool_context(processes=appConfiguration.Threads) as p:
             p.map(backup, backup_list)
 
+    for ip, proxy in proxy_list.items():
+        if not proxy.is_active():
+            try:
+                proxy.start()
+            except rb_error.RBError as e:
+                appLogging.error(e)
+
     if interrupted:
+        for ip, proxy in proxy_list.items():
+            proxy.stop()
         app_exit(0)
