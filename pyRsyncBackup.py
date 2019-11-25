@@ -141,10 +141,8 @@ def discovering(host):
                 run.wait(timeout=120)
             except ValueError:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
-                run = 1
             except subprocess.TimeoutExpired:
                 host_logging.error('Хост: {host.name} - timeout subprocess.Popen')
-                run = 1
             if run.returncode == 0:
                 host_logging.debug('Хост: {host.name} - найден модуль {module.name}'.format(module=module, host=host))
                 with rb_db.edit(discover_engine) as dbe:
@@ -252,10 +250,8 @@ def backup(host):
                 run.wait(timeout=120)
             except ValueError:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
-                run = 1
             except subprocess.TimeoutExpired:
                 host_logging.error('Хост: {host.name} - timeout subprocess.Popen')
-                run = 1
             if run.returncode == 0:
                 host_logging.info(
                     'Хост: {host.name} - успешное резервное копирование {module.name}'.format(module=module, host=host))
