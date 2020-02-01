@@ -154,7 +154,7 @@ def discovering(host):
                 res = run.communicate()
             except:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
-                run = 1
+                break
             if run.returncode == 0:
                 host_logging.debug('Хост: {host.name} - найден модуль {module.name}'.format(module=module, host=host))
                 with rb_db.edit(discover_engine) as dbe:
@@ -274,7 +274,7 @@ def backup(host):
                 res = run.communicate()
             except:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
-                run = 1
+                break
             if run.returncode == 0:
                 host_logging.info(
                     'Хост: {host.name} - успешное резервное копирование {module.name}'.format(module=module, host=host))
