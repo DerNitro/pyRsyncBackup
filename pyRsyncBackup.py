@@ -45,14 +45,12 @@ import proxy as rb_proxy
 __author__ = 'Sergey Utkin'
 __email__ = 'utkins01@gmail.com'
 __status__ = "Development"
-__version__ = "0.1"
+__version__ = "0.2"
 __maintainer__ = "Sergey Utkin"
 __copyright__ = "Copyright 2019, Sergey Utkin"
 __program__ = 'pyRsyncBackup'
 
 global appLogging
-
-dev_null = open(os.devnull, 'w')
 
 
 def handle_sig_term(signum, frame):
@@ -151,7 +149,6 @@ def discovering(host):
                                        stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE)
                 run.wait()
-                res = run.communicate()
             except:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
                 break
@@ -162,7 +159,7 @@ def discovering(host):
             else:
                 host_logging.debug('Хост: {host.name} - нет модуля {module.name}'.format(module=module, host=host))
 
-            del res, run
+            del run
     else:
         host_logging.warning('Хост: {host} - не доступен!'.format(host=host.name))
 
