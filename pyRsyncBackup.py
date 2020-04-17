@@ -51,6 +51,7 @@ __copyright__ = "Copyright 2019, Sergey Utkin"
 __program__ = 'pyRsyncBackup'
 
 global appLogging
+__timeout__ = 600
 
 
 def handle_sig_term(signum, frame):
@@ -72,6 +73,16 @@ def alive_host(ip, port):
             return True
         else:
             return False
+
+
+def popen_timeout(cmd, timeout, **kwargs):
+    run = subprocess.Popen(cmd.split(), **kwargs)
+    for i in range(timeout):
+        if run.poll() is not None:
+            return run.returncode, run.communicate()
+        time.sleep(1)
+    run.kill()
+    raise rb_error.KillTimeout('Kill process timeout pid - {}'.format(run.pid))
 
 
 def discovering(host):
@@ -145,14 +156,19 @@ def discovering(host):
 
             host_logging.debug('run discovering: {cmd}'.format(cmd=rsync_dry_run.format(host=host, module=module)))
             try:
-                run = subprocess.Popen(rsync_dry_run.format(host=host, module=module).split(),
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE)
-                run.wait()
-            except:
-                host_logging.error('Хост: {host.name} - error subprocess.Popen')
+                run, _ = popen_timeout(
+                    rsync_dry_run.format(host=host, module=module),
+                    __timeout__,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+            except rb_error.KillTimeout as err:
+                host_logging.error('Хост: {host.name} - '.format(host=host) + str(err))
                 break
-            if run.returncode == 0:
+            except:
+                host_logging.error('Хост: {host.name} - error subprocess.Popen'.format(host=host))
+                break
+            if run == 0:
                 host_logging.debug('Хост: {host.name} - найден модуль {module.name}'.format(module=module, host=host))
                 with rb_db.edit(discover_engine) as dbe:
                     dbe.add(rb_db.ActiveModules(host=host.id, module=module.name))
@@ -264,15 +280,19 @@ def backup(host):
                                                                                 module=module,
                                                                                 backup_dir=backup_dir)))
             try:
-                run = subprocess.Popen(rsync.format(host=host, module=module, backup_dir=backup_dir).split(),
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE)
-                run.wait()
-                res = run.communicate()
+                run, res = popen_timeout(
+                    rsync.format(host=host, module=module, backup_dir=backup_dir),
+                    __timeout__,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+            except rb_error.KillTimeout as err:
+                host_logging.error('Хост: {host.name} - '.format(host=host) + str(err))
+                break
             except:
                 host_logging.error('Хост: {host.name} - error subprocess.Popen')
                 break
-            if run.returncode == 0:
+            if run == 0:
                 host_logging.info(
                     'Хост: {host.name} - успешное резервное копирование {module.name}'.format(module=module, host=host))
             else:

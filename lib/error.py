@@ -25,3 +25,7 @@
 
 class RBError(Exception):
     pass
+
+
+class KillTimeout(Exception):
+    pass
