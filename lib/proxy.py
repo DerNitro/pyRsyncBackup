@@ -24,8 +24,11 @@
 
 import database as rb_db
 import log as rb_log
-import error as rb_error
 import sshtunnel
+
+
+class RBError(Exception):
+    pass
 
 
 class Proxy:
@@ -47,9 +50,9 @@ class Proxy:
         try:
             self.client.start()
         except sshtunnel.HandlerSSHTunnelForwarderError:
-            rb_error.RBError('Ошибка подключения к прокси серверу - {proxy.ip}'.format(proxy=self.proxy))
+            RBError('Ошибка подключения к прокси серверу - {proxy.ip}'.format(proxy=self.proxy))
         except sshtunnel.BaseSSHTunnelForwarderError:
-            rb_error.RBError('Ошибка подключения к прокси серверу - {proxy.ip}'.format(proxy=self.proxy))
+            RBError('Ошибка подключения к прокси серверу - {proxy.ip}'.format(proxy=self.proxy))
 
     def get_port_forward_info(self):
         return self.client.local_bind_address

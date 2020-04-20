@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 PIDFile=/run/pyRsyncBackup.pid
-ExecStart=/usr/bin/python2 /opt/pyRsyncBackup/pyRsyncBackup.py
+ExecStart=/usr/bin/python3 /opt/pyRsyncBackup/pyRsyncBackup.py
 ExecStop=/bin/kill -15 $MAINPID
 PrivateTmp=true
 User=backup

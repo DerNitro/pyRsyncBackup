@@ -22,10 +22,7 @@
    limitations under the License.
 """
 import database as rb_db
-try:
-    from configparser import ConfigParser
-except ImportError:
-    from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 
 def calc_size(size):

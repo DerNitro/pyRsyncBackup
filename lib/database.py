@@ -30,7 +30,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from contextlib import contextmanager
 from configparser import ConfigParser, MissingSectionHeaderError, DuplicateOptionError
 
-import error as rb_error
 
 Base = declarative_base()
 
@@ -50,6 +49,10 @@ def edit(engine):
     yield session
     session.commit()
     session.close()
+
+
+class RBError(Exception):
+    pass
 
 
 class Module(Base):
@@ -176,10 +179,12 @@ def check_database(engine):
         connection = engine.connect()
         connection.execute("select datname from pg_database;")
         connection.close()
-    except sql_exc.DisconnectionError, sql_exc.TimeoutError:
-        raise rb_error.RBError('Ошибка подключения к базе данных: {}'.format(engine))
+    except sql_exc.DisconnectionError:
+        raise RBError('Ошибка подключения к базе данных: {}'.format(engine))
+    except sql_exc.TimeoutError:
+        raise RBError('Ошибка подключения к базе данных: {}'.format(engine))
     except sql_exc.NoSuchTableError:
-        raise rb_error.RBError('Ошибка при проверке базы данных: {}'.format(engine))
+        raise RBError('Ошибка при проверке базы данных: {}'.format(engine))
 
     # Создание структуры приложения
     create(engine)
@@ -199,9 +204,9 @@ def import_host(engine, conf):
         config = ConfigParser()
         config.read(conf)
     except MissingSectionHeaderError:
-        raise rb_error.RBError('Ошибка чтения файла: {file}'.format(file=conf))
+        raise RBError('Ошибка чтения файла: {file}'.format(file=conf))
     except DuplicateOptionError:
-        raise rb_error.RBError('Найдены дубли хостов: {file}'.format(file=conf))
+        raise RBError('Найдены дубли хостов: {file}'.format(file=conf))
 
     backup_directory = config.get('Main', 'BackupDirectory', fallback=None)
     backup_interval = config.get('Main', 'BackupInterval', fallback=None)
@@ -218,7 +223,7 @@ def import_host(engine, conf):
         proxy.password = config.get('Proxy', 'password', fallback=None)
 
         if not proxy.ip:
-            raise rb_error.RBError('Не полная информация о Proxy сервере: {file}'.format(file=conf))
+            raise RBError('Не полная информация о Proxy сервере: {file}'.format(file=conf))
         else:
             with edit(engine) as db:
                 db.add(proxy)
@@ -226,7 +231,7 @@ def import_host(engine, conf):
                 db.refresh(proxy)
                 proxy_id = proxy.id
     if not config.has_section('Host'):
-        raise rb_error.RBError('Отсутствует секция "Host" в конфигурационном файле: {file}'.format(file=conf))
+        raise RBError('Отсутствует секция "Host" в конфигурационном файле: {file}'.format(file=conf))
 
     for item in config.items('Host', True):
         host = Host()

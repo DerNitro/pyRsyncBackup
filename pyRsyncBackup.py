@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
@@ -39,7 +39,6 @@ sys.path.append(os.path.join(run_dir_name, 'lib'))
 import config as rb_conf
 import log as rb_log
 import database as rb_db
-import error as rb_error
 import proxy as rb_proxy
 
 __author__ = 'Sergey Utkin'
@@ -52,6 +51,14 @@ __program__ = 'pyRsyncBackup'
 
 global appLogging
 __timeout__ = 600
+
+
+class RBError(Exception):
+    pass
+
+
+class KillTimeout(Exception):
+    pass
 
 
 def handle_sig_term(signum, frame):
@@ -82,7 +89,8 @@ def popen_timeout(cmd, timeout, **kwargs):
             return run.returncode, run.communicate()
         time.sleep(1)
     run.kill()
-    raise rb_error.KillTimeout('Kill process timeout pid - {}'.format(run.pid))
+    appLogging.critical('Kill process timeout pid - {}'.format(run.pid))
+    raise KillTimeout('Kill process timeout pid - {}'.format(run.pid))
 
 
 def discovering(host):
@@ -131,7 +139,7 @@ def discovering(host):
         tunnel = rb_proxy.Proxy(proxy, host, host_logging)
         try:
             tunnel.start()
-        except rb_error.RBError as err:
+        except RBError as err:
             appLogging.error(err)
             del host_logging
             return False
@@ -162,7 +170,7 @@ def discovering(host):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-            except rb_error.KillTimeout as err:
+            except KillTimeout as err:
                 host_logging.error('Хост: {host.name} - '.format(host=host) + str(err))
                 break
             except:
@@ -234,7 +242,7 @@ def backup(host):
         tunnel = rb_proxy.Proxy(proxy, host, host_logging)
         try:
             tunnel.start()
-        except rb_error.RBError as err:
+        except RBError as err:
             appLogging.error(err)
             del host_logging
             return False
@@ -286,7 +294,7 @@ def backup(host):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-            except rb_error.KillTimeout as err:
+            except KillTimeout as err:
                 host_logging.error('Хост: {host.name} - '.format(host=host) + str(err))
                 break
             except:
@@ -355,7 +363,7 @@ engine = create_engine(
 
 try:
     rb_db.check_database(engine)
-except rb_error.RBError as error:
+except RBError as error:
     appLogging.critical(error)
     app_exit(1)
 
@@ -365,7 +373,7 @@ for config_file in os.listdir(appConfiguration.HostList):
             appLogging.debug('Инициализация конфигурации: {file}'.format(
                 file=os.path.join(appConfiguration.HostList, config_file)))
             rb_db.import_host(engine, os.path.join(appConfiguration.HostList, config_file))
-        except rb_error.RBError as e:
+        except RBError as e:
             appLogging.warning(e)
 
 appConfiguration.load_modules(engine)
